@@ -108,6 +108,15 @@ func Logout(c *Context) {
 	c.Status(302)
 }
 
+// 测试动态路由
+func TestDynamicRouting(c *Context) {
+	var text string
+	for k, v := range c.Params {
+		text += k + ":" + v + "\n"
+	}
+	c.String(http.StatusOK, text)
+}
+
 // 从数据库中比对用户名和密码
 func checkLogin(username string, password string) (bool, error) {
 	globalDbLock.Lock()

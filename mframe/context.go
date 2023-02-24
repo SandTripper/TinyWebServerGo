@@ -12,9 +12,10 @@ import (
 type Context struct {
 	Writer     http.ResponseWriter
 	Req        *http.Request
-	Path       string //请求的路径
-	Method     string //请求模式
-	StatusCode int    //回复的状态码
+	Path       string            //请求的路径
+	Method     string            //请求模式
+	StatusCode int               //回复的状态码
+	Params     map[string]string //存储动态路由匹配的表单
 }
 
 // 新建一个Context
@@ -25,6 +26,12 @@ func newContext(writer http.ResponseWriter, req *http.Request) *Context {
 		Path:   req.URL.Path,
 		Method: req.Method,
 	}
+}
+
+// 获取动态匹配后某个键对应的值
+func (c *Context) Param(key string) string {
+	value, _ := c.Params[key]
+	return value
 }
 
 // 返回请求的表单中key对应的值
