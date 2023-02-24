@@ -52,13 +52,16 @@ func (r *router) handle(c *Context) {
 	if node != nil {
 		c.Params = params
 		key := c.Method + "-" + node.pattern
-		r.handlers[key](c)
+		c.handlers = append(c.handlers, r.handlers[key]) //将处理函数添加到中间件的最后，以做到中间件可以在处理函数的开始和结束执行操作
 	} else {
-		err := c.HTMLF(http.StatusOK, "root/404.html")
-		if err != nil { //读取页面时出错
-			c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path) //返回默认404界面
-		}
+		c.handlers = append(c.handlers, func(c *Context) { //将处理函数添加到中间件的最后，以做到中间件可以在处理函数的开始和结束执行操作
+			err := c.HTMLF(http.StatusOK, "root/404.html")
+			if err != nil { //读取页面时出错
+				c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path) //返回默认404界面
+			}
+		})
 	}
+	c.Next()
 }
 
 // 将请求路径与前缀树进行匹配，返回匹配到的节点和匹配的表单

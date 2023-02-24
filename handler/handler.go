@@ -14,17 +14,17 @@ import (
 
 type Context = mframe.Context
 
-var globalSessions *sessionmanager.SessionManager
+var GlobalSessions *sessionmanager.SessionManager
 
-var globalDb *sql.DB
-var globalDbLock sync.Mutex
+var GlobalDb *sql.DB
+var GlobalDbLock sync.Mutex
 
 func init() {
 	//实例化会话管理器
 	provider := sessionmanager.NewMemoryProvider()
-	globalSessions = sessionmanager.NewSessionManager("sessionId", 3600, 3600, 60, provider)
+	GlobalSessions = sessionmanager.NewSessionManager("sessionId", 3600, 3600, 60, provider)
 	var err error
-	globalDb, err = sql.Open("mysql", "root:@/tiny_web_server_go?charset=utf8")
+	GlobalDb, err = sql.Open("mysql", "root:@/tiny_web_server_go?charset=utf8")
 	checkError(err)
 }
 
@@ -36,8 +36,8 @@ func ShowIndexPage(c *Context) {
 
 // 显示登录界面
 func ShowLoginPage(c *Context) {
-	if _, err := globalSessions.Get(c.Req, "username"); err == nil { //已经登录，重定向至欢迎界面
-		c.SetHeader("Location", "/welcome")
+	if _, err := GlobalSessions.Get(c.Req, "username"); err == nil { //已经登录，重定向至欢迎界面
+		c.SetHeader("Location", "/user/welcome")
 		c.Status(302)
 		return
 	}
@@ -57,8 +57,8 @@ func CheckLoginReq(c *Context) {
 	if isAccept {
 		data := make(map[string]string)
 		data["username"] = username
-		globalSessions.Create(&c.Writer, c.Req, data)
-		c.SetHeader("Location", "/welcome")
+		GlobalSessions.Create(&c.Writer, c.Req, data)
+		c.SetHeader("Location", "/user/welcome")
 		c.Status(302)
 	} else {
 		err := c.HTMLFT(http.StatusOK, "root/login.html", "用户名或密码错误")
@@ -82,7 +82,7 @@ func CheckRegisterReq(c *Context) {
 		return
 	}
 	if isAccept { //注册成功，重定向到登录界面
-		c.SetHeader("Location", "/login")
+		c.SetHeader("Location", "/auth/login")
 		c.Status(302)
 	} else {
 		err := c.HTMLFT(http.StatusOK, "root/register.html", "该用户名已被注册")
@@ -92,18 +92,18 @@ func CheckRegisterReq(c *Context) {
 
 // 显示欢迎界面
 func ShowWelcomePage(c *Context) {
-	if username, err := globalSessions.Get(c.Req, "username"); err == nil { //已经登陆，显示用户名字
+	if username, err := GlobalSessions.Get(c.Req, "username"); err == nil { //已经登陆，显示用户名字
 		err := c.HTMLFT(http.StatusOK, "root/welcome.html", username)
 		checkServerUnavailableErr(c, err)
 	} else { //未登录，重定向至登录界面
-		c.SetHeader("Location", "/login")
+		c.SetHeader("Location", "/auth/login")
 		c.Status(302)
 	}
 }
 
 // 登出逻辑
 func Logout(c *Context) {
-	globalSessions.Destroy(&c.Writer, c.Req) //销毁会话
+	GlobalSessions.Destroy(&c.Writer, c.Req) //销毁会话
 	c.SetHeader("Location", "/index")
 	c.Status(302)
 }
@@ -119,9 +119,9 @@ func TestDynamicRouting(c *Context) {
 
 // 从数据库中比对用户名和密码
 func checkLogin(username string, password string) (bool, error) {
-	globalDbLock.Lock()
-	defer globalDbLock.Unlock()
-	err := globalDb.QueryRow("SELECT * FROM user_tb WHERE username = ? AND password = ?", username, password).Scan(&username, &password)
+	GlobalDbLock.Lock()
+	defer GlobalDbLock.Unlock()
+	err := GlobalDb.QueryRow("SELECT * FROM user_tb WHERE username = ? AND password = ?", username, password).Scan(&username, &password)
 	switch {
 	case err == sql.ErrNoRows: //不存在结果，即用户名或密码错误
 		return false, nil
@@ -134,10 +134,10 @@ func checkLogin(username string, password string) (bool, error) {
 
 // 检查并尝试注册，返回注册结果
 func doRegister(username string, password string) (bool, error) {
-	globalDbLock.Lock()
-	defer globalDbLock.Unlock()
+	GlobalDbLock.Lock()
+	defer GlobalDbLock.Unlock()
 
-	err := globalDb.QueryRow("SELECT username FROM user_tb WHERE username = ?", username).Scan(&username)
+	err := GlobalDb.QueryRow("SELECT username FROM user_tb WHERE username = ?", username).Scan(&username)
 	switch {
 	case err == sql.ErrNoRows: //不存在结果，即用户名或密码错误
 		break
@@ -146,7 +146,7 @@ func doRegister(username string, password string) (bool, error) {
 	default:
 		return false, nil
 	}
-	stmt, err := globalDb.Prepare("INSERT INTO user_tb VALUES (?,?)")
+	stmt, err := GlobalDb.Prepare("INSERT INTO user_tb VALUES (?,?)")
 	if err != nil {
 		return false, err
 	}

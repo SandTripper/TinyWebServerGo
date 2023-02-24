@@ -16,6 +16,8 @@ type Context struct {
 	Method     string            //请求模式
 	StatusCode int               //回复的状态码
 	Params     map[string]string //存储动态路由匹配的表单
+	handlers   []HandlerFunc     //需要执行的中间件
+	index      int               //当前执行的中间件的序号
 }
 
 // 新建一个Context
@@ -25,12 +27,22 @@ func newContext(writer http.ResponseWriter, req *http.Request) *Context {
 		Req:    req,
 		Path:   req.URL.Path,
 		Method: req.Method,
+		index:  -1,
+	}
+}
+
+// 中间件执行过程中调用以先执行其余中间件和逻辑函数
+func (c *Context) Next() {
+	c.index++
+	s := len(c.handlers)
+	for ; c.index < s; c.index++ {
+		c.handlers[c.index](c)
 	}
 }
 
 // 获取动态匹配后某个键对应的值
 func (c *Context) Param(key string) string {
-	value, _ := c.Params[key]
+	value := c.Params[key]
 	return value
 }
 
