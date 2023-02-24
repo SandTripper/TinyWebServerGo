@@ -4,8 +4,6 @@ import (
 	"TinyWebServerGo/handler"
 	"TinyWebServerGo/mframe"
 	"fmt"
-	"log"
-	"net/http"
 )
 
 func main() {
@@ -20,9 +18,4 @@ func main() {
 	engine.POST("/register", handler.CheckRegisterReq)
 	engine.POST("/logout", handler.Logout)
 	engine.Run(":8888")
-
-	err := http.ListenAndServe(":8888", nil)
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
-	}
 }

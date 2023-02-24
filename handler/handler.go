@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -16,6 +17,7 @@ type Context = mframe.Context
 var globalSessions *sessionmanager.SessionManager
 
 var globalDb *sql.DB
+var globalDbLock sync.Mutex
 
 func init() {
 	//实例化会话管理器
@@ -101,13 +103,15 @@ func ShowWelcomePage(c *Context) {
 
 // 登出逻辑
 func Logout(c *Context) {
-	globalSessions.Destroy(&c.Writer, c.Req)
+	globalSessions.Destroy(&c.Writer, c.Req) //销毁会话
 	c.SetHeader("Location", "/index")
 	c.Status(302)
 }
 
 // 从数据库中比对用户名和密码
 func checkLogin(username string, password string) (bool, error) {
+	globalDbLock.Lock()
+	defer globalDbLock.Unlock()
 	err := globalDb.QueryRow("SELECT * FROM user_tb WHERE username = ? AND password = ?", username, password).Scan(&username, &password)
 	switch {
 	case err == sql.ErrNoRows: //不存在结果，即用户名或密码错误
@@ -121,6 +125,9 @@ func checkLogin(username string, password string) (bool, error) {
 
 // 检查并尝试注册，返回注册结果
 func doRegister(username string, password string) (bool, error) {
+	globalDbLock.Lock()
+	defer globalDbLock.Unlock()
+
 	err := globalDb.QueryRow("SELECT username FROM user_tb WHERE username = ?", username).Scan(&username)
 	switch {
 	case err == sql.ErrNoRows: //不存在结果，即用户名或密码错误

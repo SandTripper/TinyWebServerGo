@@ -1,6 +1,10 @@
 package mframe
 
-import "net/http"
+import (
+	"net/http"
+)
+
+var tot = 0
 
 // 定义处理函数类
 type HandlerFunc func(*Context)
@@ -32,6 +36,6 @@ func (engine *Engine) Run(addr string) (err error) {
 }
 
 func (engine *Engine) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
-	c := newContext(writer, req) //将信息封装在context内
-	engine.router.handle(c)      //执行路由匹配
+	context := newContext(writer, req)
+	engine.router.handle(context) //执行路由匹配
 }
