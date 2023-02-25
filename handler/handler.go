@@ -5,11 +5,12 @@ import (
 	"TinyWebServerGo/sessionmanager"
 	"database/sql"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 
 	_ "github.com/go-sql-driver/mysql"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Context = mframe.Context
@@ -117,6 +118,11 @@ func TestDynamicRouting(c *Context) {
 	c.String(http.StatusOK, text)
 }
 
+// 中间件，记录访问日志
+func RecordAccessLog(c *Context) {
+	log.Infof("(ip:%s) %s URI:(%s)", c.Req.RemoteAddr, c.Req.Method, c.Req.RequestURI)
+}
+
 // 从数据库中比对用户名和密码
 func checkLogin(username string, password string) (bool, error) {
 	GlobalDbLock.Lock()
@@ -157,10 +163,10 @@ func doRegister(username string, password string) (bool, error) {
 	return true, nil
 }
 
-// 检查是否出现服务器错误，若出错，向浏览器返回503，并返回true
+// 检查是否出现错误，若出错，向浏览器返回503，并返回true
 func checkServerUnavailableErr(c *Context, err error) bool {
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		serviceUnavailable(c) //向客户端返回服务器错误
 		return true
 	}
@@ -174,6 +180,6 @@ func serviceUnavailable(c *Context) {
 // 如果出现错误，panic
 func checkError(err error) {
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 }
