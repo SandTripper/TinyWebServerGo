@@ -22,12 +22,12 @@ type SessionManager struct {
 
 // session的底层存储结构
 type sessionProvider interface {
-	create(sessionId string, data map[string]string) error //创建session
-	get(sessionId, key string) (string, error)             //读取session键值
-	getAll(sessionId string) (map[string]string, error)    //读取session所有键值对
-	set(sessionId, key string, value string) error         //设置session键值
-	destroy(sessionId string) error                        //销毁session
-	gc(expire int64) error                                 //垃圾回收：删除过期session
+	create(sessionId string, data map[string]interface{}) error //创建session
+	get(sessionId, key string) (interface{}, error)             //读取session键值
+	getAll(sessionId string) (map[string]interface{}, error)    //读取session所有键值对
+	set(sessionId, key string, value interface{}) error         //设置session键值
+	destroy(sessionId string) error                             //销毁session
+	gc(expire int64) error                                      //垃圾回收：删除过期session
 }
 
 func NewSessionManager(cookieName string, cookieExpire int, sessionExpire int64, gcDuration int, provider sessionProvider) *SessionManager {
@@ -62,7 +62,7 @@ func (sm *SessionManager) getSessionId(req *http.Request) (string, error) {
 }
 
 // 创建session
-func (sm *SessionManager) Create(writer *http.ResponseWriter, req *http.Request, data map[string]string) error {
+func (sm *SessionManager) Create(writer *http.ResponseWriter, req *http.Request, data map[string]interface{}) error {
 	sessionId, _ := sm.getSessionId(req)
 	if len(sessionId) > 0 { //请求中已有sessionId
 		data, _ := sm.provider.getAll(sessionId)
@@ -99,7 +99,7 @@ func (sm *SessionManager) Create(writer *http.ResponseWriter, req *http.Request,
 }
 
 // 获取session键值err
-func (sm *SessionManager) Get(req *http.Request, key string) (string, error) {
+func (sm *SessionManager) Get(req *http.Request, key string) (interface{}, error) {
 	sessionId, err := sm.getSessionId(req)
 	if err != nil {
 		return "", errors.New("length of sessionId is 0")
@@ -108,7 +108,7 @@ func (sm *SessionManager) Get(req *http.Request, key string) (string, error) {
 }
 
 // 读取session所有键值对
-func (sm *SessionManager) GetAll(req *http.Request) (map[string]string, error) {
+func (sm *SessionManager) GetAll(req *http.Request) (map[string]interface{}, error) {
 	sessionId, err := sm.getSessionId(req)
 	if err != nil {
 		return nil, errors.New("length of sessionId is 0")

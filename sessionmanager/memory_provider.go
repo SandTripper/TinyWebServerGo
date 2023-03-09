@@ -15,18 +15,18 @@ type sessionTimePair struct {
 type MemoryProvider struct {
 	sessionsLock        sync.RWMutex
 	createTimeUnixsLock sync.RWMutex
-	sessions            map[string]map[string]string
+	sessions            map[string]map[string]interface{}
 	createTimeUnixs     *list.List
 }
 
 func NewMemoryProvider() *MemoryProvider {
 	return &MemoryProvider{
-		sessions:        make(map[string]map[string]string),
+		sessions:        make(map[string]map[string]interface{}),
 		createTimeUnixs: list.New(),
 	}
 }
 
-func (mp *MemoryProvider) create(sessionId string, data map[string]string) error { //创建session
+func (mp *MemoryProvider) create(sessionId string, data map[string]interface{}) error { //创建session
 	mp.sessionsLock.Lock()
 	defer mp.sessionsLock.Unlock()
 	if _, ok := mp.sessions[sessionId]; ok { //已存在sessionId
@@ -42,7 +42,7 @@ func (mp *MemoryProvider) create(sessionId string, data map[string]string) error
 	return nil
 }
 
-func (mp *MemoryProvider) get(sessionId, key string) (string, error) { //读取session键值
+func (mp *MemoryProvider) get(sessionId, key string) (interface{}, error) { //读取session键值
 	mp.sessionsLock.RLock()
 	defer mp.sessionsLock.RUnlock()
 	if _, ok := mp.sessions[sessionId]; !ok { //不存在sessionId
@@ -54,7 +54,7 @@ func (mp *MemoryProvider) get(sessionId, key string) (string, error) { //读取s
 		return "", errors.New("key not found")
 	}
 }
-func (mp *MemoryProvider) getAll(sessionId string) (map[string]string, error) { //读取session所有键值对
+func (mp *MemoryProvider) getAll(sessionId string) (map[string]interface{}, error) { //读取session所有键值对
 	mp.sessionsLock.RLock()
 	defer mp.sessionsLock.RUnlock()
 	if data, ok := mp.sessions[sessionId]; !ok { //不存在sessionId
@@ -63,7 +63,7 @@ func (mp *MemoryProvider) getAll(sessionId string) (map[string]string, error) { 
 		return data, nil
 	}
 }
-func (mp *MemoryProvider) set(sessionId, key string, value string) error { //设置session键值
+func (mp *MemoryProvider) set(sessionId, key string, value interface{}) error { //设置session键值
 	mp.sessionsLock.Lock()
 	defer mp.sessionsLock.Unlock()
 	if _, ok := mp.sessions[sessionId]; !ok { //不存在sessionId

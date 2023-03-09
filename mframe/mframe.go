@@ -64,9 +64,14 @@ func (group *RouterGroup) Use(middlewares ...HandlerFunc) {
 	group.middlewares = append(group.middlewares, middlewares...)
 }
 
-// 框架的启动函数
+// 框架的http启动函数
 func (engine *Engine) Run(addr string) (err error) {
 	return http.ListenAndServe(addr, engine)
+}
+
+// 框架的https启动函数
+func (engine *Engine) RunTLS(addr string, certFile string, keyFile string) (err error) {
+	return http.ListenAndServeTLS(addr, certFile, keyFile, engine)
 }
 
 func (engine *Engine) ServeHTTP(writer http.ResponseWriter, req *http.Request) {

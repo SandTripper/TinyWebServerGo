@@ -10,14 +10,16 @@ import (
 )
 
 type Context struct {
-	Writer     http.ResponseWriter
-	Req        *http.Request
-	Path       string            //请求的路径
-	Method     string            //请求模式
-	StatusCode int               //回复的状态码
-	Params     map[string]string //存储动态路由匹配的表单
-	handlers   []HandlerFunc     //需要执行的中间件
-	index      int               //当前执行的中间件的序号
+	Writer          http.ResponseWriter
+	Req             *http.Request
+	Path            string            //请求的路径
+	Method          string            //请求模式
+	StatusCode      int               //回复的状态码
+	Params          map[string]string //存储动态路由匹配的表单
+	handlers        []HandlerFunc     //需要执行的中间件
+	index           int               //当前执行的中间件的序号
+	Username        string            //用户名
+	PermissionLevel int               //用户权限等级
 }
 
 // 新建一个Context
@@ -82,6 +84,13 @@ func (c *Context) JSON(code int, obj interface{}) {
 	if err := encoder.Encode(obj); err != nil {
 		http.Error(c.Writer, err.Error(), 500)
 	}
+}
+
+// 返回文件
+func (c *Context) File(code int, path string) {
+	c.SetHeader("Content-Type", "application/octet-stream")
+	c.Status(code)
+	http.ServeFile(c.Writer, c.Req, path)
 }
 
 // 返回二进制数组

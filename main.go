@@ -60,8 +60,16 @@ func main() {
 	engine.GET("/test1/:mao/end", handler.TestDynamicRouting)
 	engine.GET("/test2/middle/*star", handler.TestDynamicRouting)
 	engine.GET("/index", handler.ShowIndexPage)
+	engine.GET("/robots.txt", handler.ShowRobotsTxt)
+	engine.GET("/favicon.ico", handler.ShowFavicon)
 
 	engine.Use(handler.RecordAccessLog)
+	engine.Use(handler.GetUserData)
+
+	groupApi := engine.Group("/api")
+	{
+		groupApi.GET("/douyin", handler.DouYinUrlHandler)
+	}
 
 	groupAuth := engine.Group("/auth")
 	{
@@ -77,6 +85,6 @@ func main() {
 		groupUser.POST("/logout", handler.Logout)
 	}
 
-	fmt.Print("server start at port 8888\n")
-	engine.Run(":8888")
+	fmt.Print("server start at port 443\n")
+	engine.RunTLS(":443", "sandtripper.cn_bundle.crt", "sandtripper.cn.key")
 }

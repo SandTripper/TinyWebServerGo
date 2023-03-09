@@ -6,7 +6,11 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"plugin"
+	"runtime"
+	"strconv"
 	"sync"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 
@@ -19,6 +23,9 @@ var GlobalSessions *sessionmanager.SessionManager
 
 var GlobalDb *sql.DB
 var GlobalDbLock sync.Mutex
+
+var lastDouYinReqTime = time.Now().UnixMilli() //上次服务器向抖音发出请求的时间
+var intervalBetweenDouYinReq int64 = 10000     //请求的间隔时间
 
 func init() {
 	//实例化会话管理器
@@ -37,7 +44,7 @@ func ShowIndexPage(c *Context) {
 
 // 显示登录界面
 func ShowLoginPage(c *Context) {
-	if _, err := GlobalSessions.Get(c.Req, "username"); err == nil { //已经登录，重定向至欢迎界面
+	if c.PermissionLevel >= 1 { //已经登录，重定向至欢迎界面
 		c.SetHeader("Location", "/user/welcome")
 		c.Status(302)
 		return
@@ -50,14 +57,22 @@ func ShowLoginPage(c *Context) {
 func CheckLoginReq(c *Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
-	fmt.Printf("username: %v, password: %v\n", username, password)
+
 	isAccept, err := checkLogin(username, password)
 	if checkServerUnavailableErr(c, err) { //读取数据时发生错误
 		return
 	}
 	if isAccept {
-		data := make(map[string]string)
+		data := make(map[string]interface{})
+
+		permissionLevel, err := getUserPerFromSql(username)
+		if checkServerUnavailableErr(c, err) {
+			return
+		}
+
 		data["username"] = username
+		data["permission_level"] = permissionLevel
+
 		GlobalSessions.Create(&c.Writer, c.Req, data)
 		c.SetHeader("Location", "/user/welcome")
 		c.Status(302)
@@ -93,8 +108,8 @@ func CheckRegisterReq(c *Context) {
 
 // 显示欢迎界面
 func ShowWelcomePage(c *Context) {
-	if username, err := GlobalSessions.Get(c.Req, "username"); err == nil { //已经登陆，显示用户名字
-		err := c.HTMLFT(http.StatusOK, "root/welcome.html", username)
+	if c.PermissionLevel >= 1 { //已经登陆，显示用户名字
+		err := c.HTMLFT(http.StatusOK, "root/welcome.html", c.Username)
 		checkServerUnavailableErr(c, err)
 	} else { //未登录，重定向至登录界面
 		c.SetHeader("Location", "/auth/login")
@@ -109,6 +124,42 @@ func Logout(c *Context) {
 	c.Status(302)
 }
 
+func ShowRobotsTxt(c *Context) {
+	c.String(200, "User-agent: *\nDisallow: /")
+}
+
+func ShowFavicon(c *Context) {
+	c.File(200, "root/favicon.ico")
+}
+
+// 抖音直链提取api
+func DouYinUrlHandler(c *Context) {
+
+	p, err := plugin.Open("./lib/ParseDouYinUrl.so")
+	checkServerUnavailableErr(c, err)
+	symbol, err := p.Lookup("GetDouYinRealUrl")
+	checkServerUnavailableErr(c, err)
+	GetDouYinRealUrl := symbol.(func(string) (string, error))
+
+	for time.Now().UnixMilli()-lastDouYinReqTime < intervalBetweenDouYinReq { //冷却时间未达到，让出时间片
+		runtime.Gosched()
+	}
+	lastDouYinReqTime = time.Now().UnixMilli()
+
+	ans, err := GetDouYinRealUrl(c.PostForm("url"))
+	data := make(map[string]interface{})
+	if err == nil {
+		data["status"] = "ok"
+		data["url"] = ans
+		c.JSON(200, data)
+	} else {
+		data["status"] = "invalid url"
+		data["url"] = ""
+		c.JSON(200, data)
+	}
+
+}
+
 // 测试动态路由
 func TestDynamicRouting(c *Context) {
 	var text string
@@ -116,11 +167,6 @@ func TestDynamicRouting(c *Context) {
 		text += k + ":" + v + "\n"
 	}
 	c.String(http.StatusOK, text)
-}
-
-// 中间件，记录访问日志
-func RecordAccessLog(c *Context) {
-	log.Infof("(ip:%s) %s URI:(%s)", c.Req.RemoteAddr, c.Req.Method, c.Req.RequestURI)
 }
 
 // 从数据库中比对用户名和密码
@@ -136,6 +182,21 @@ func checkLogin(username string, password string) (bool, error) {
 	default:
 		return true, nil
 	}
+}
+
+func getUserPerFromSql(username string) (int, error) {
+	GlobalDbLock.Lock()
+	defer GlobalDbLock.Unlock()
+	var str string
+	err := GlobalDb.QueryRow("SELECT permission_level FROM user_permission_level_tb WHERE username = ?", username).Scan(&str)
+	if err == nil {
+		permissionLevel, err := strconv.Atoi(str)
+		if err == nil {
+			return permissionLevel, nil
+		}
+		return 0, err
+	}
+	return 0, err
 }
 
 // 检查并尝试注册，返回注册结果
@@ -160,6 +221,17 @@ func doRegister(username string, password string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
+	//初始化权限
+	stmt, err = GlobalDb.Prepare("INSERT INTO user_permission_level_tb VALUES (?,?)")
+	if err != nil {
+		return false, err
+	}
+	_, err = stmt.Exec(username, 1) //执行插入
+	if err != nil {
+		return false, err
+	}
+
 	return true, nil
 }
 
